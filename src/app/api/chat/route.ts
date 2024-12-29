@@ -12,28 +12,46 @@ const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 })
 
-// Updated PDF processing function with better error handling
+// Configure the PDF path using environment variable with fallback
+const PDF_PATH = process.env.PDF_FILE_PATH || path.join(process.cwd(), 'public', 'book.pdf')
+
+// Debug function to check paths
+function debugPaths() {
+  console.log('Current working directory:', process.cwd())
+  console.log('Attempting to read PDF from:', PDF_PATH)
+  console.log('Directory contents:', fs.readdirSync(process.cwd()))
+  if (fs.existsSync('public')) {
+    console.log('Public directory contents:', fs.readdirSync('public'))
+  }
+}
+
 async function processPDF() {
   try {
-    // Adjust this path to match your PDF location
-    const pdfPath = path.join(process.cwd(), 'public', 'book.pdf')
+    // Log debug information
+    debugPaths()
     
-    // Check if file exists
-    if (!fs.existsSync(pdfPath)) {
-      throw new Error(`PDF file not found at path: ${pdfPath}`)
+    // Verify file exists
+    if (!fs.existsSync(PDF_PATH)) {
+      console.error('PDF file not found at:', PDF_PATH)
+      throw new Error(`PDF file not found at path: ${PDF_PATH}`)
     }
     
-    const dataBuffer = fs.readFileSync(pdfPath)
+    console.log('Reading PDF file...')
+    const dataBuffer = fs.readFileSync(PDF_PATH)
+    
+    console.log('Parsing PDF content...')
     const data = await pdf(dataBuffer)
     
     if (!data || !data.text) {
       throw new Error('Failed to extract text from PDF')
     }
     
+    console.log('Successfully extracted text from PDF')
     return data.text
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('PDF processing error:', error)
-    throw new Error(`Failed to process PDF: ${error.message}`)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    throw new Error(`Failed to process PDF: ${errorMessage}`)
   }
 }
 
@@ -43,7 +61,7 @@ async function initializePinecone() {
   try {
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!)
     
-    console.log('Processing PDF...')
+    console.log('Starting PDF processing...')
     const pdfText = await processPDF()
     
     console.log('Splitting text into chunks...')
@@ -79,9 +97,10 @@ async function initializePinecone() {
 
     isInitialized = true
     console.log('Initialization complete')
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Initialization error:', error)
-    throw error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    throw new Error(`Initialization failed: ${errorMessage}`)
   }
 }
 
@@ -133,10 +152,11 @@ export async function POST(req: Request) {
     return NextResponse.json({
       answer: completion.choices[0].message.content
     })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in POST handler:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return NextResponse.json({ 
-      error: 'Failed to process request: ' + (error.message || 'Unknown error')
+      error: `Failed to process request: ${errorMessage}`
     }, { status: 500 })
   }
 }
