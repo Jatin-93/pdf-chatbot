@@ -8,18 +8,33 @@ import pdf from 'pdf-parse'
 
 let isInitialized = false
 
-// Initialize Pinecone client with updated configuration
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 })
 
-// Rest of the code remains the same
+// Updated PDF processing function with better error handling
 async function processPDF() {
-  const pdfPath = path.join(process.cwd(), 'data', 'book.pdf')
-  const dataBuffer = fs.readFileSync(pdfPath)
-  
-  const data = await pdf(dataBuffer)
-  return data.text
+  try {
+    // Adjust this path to match your PDF location
+    const pdfPath = path.join(process.cwd(), 'public', 'book.pdf')
+    
+    // Check if file exists
+    if (!fs.existsSync(pdfPath)) {
+      throw new Error(`PDF file not found at path: ${pdfPath}`)
+    }
+    
+    const dataBuffer = fs.readFileSync(pdfPath)
+    const data = await pdf(dataBuffer)
+    
+    if (!data || !data.text) {
+      throw new Error('Failed to extract text from PDF')
+    }
+    
+    return data.text
+  } catch (error) {
+    console.error('PDF processing error:', error)
+    throw new Error(`Failed to process PDF: ${error.message}`)
+  }
 }
 
 async function initializePinecone() {
@@ -28,11 +43,9 @@ async function initializePinecone() {
   try {
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!)
     
-    // Process PDF and get text
     console.log('Processing PDF...')
     const pdfText = await processPDF()
     
-    // Split text into chunks
     console.log('Splitting text into chunks...')
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
@@ -46,7 +59,6 @@ async function initializePinecone() {
       openAIApiKey: process.env.OPENAI_API_KEY,
     })
     
-    // Create and store embeddings in batches
     console.log('Creating embeddings...')
     for (let i = 0; i < chunks.length; i += 100) {
       const batchChunks = chunks.slice(i, i + 100)
@@ -61,7 +73,6 @@ async function initializePinecone() {
         })
       )
       
-      // Upload batch to Pinecone
       await index.upsert(batchVectors)
       console.log(`Uploaded batch ${i/100 + 1}/${Math.ceil(chunks.length/100)}`)
     }
@@ -123,7 +134,9 @@ export async function POST(req: Request) {
       answer: completion.choices[0].message.content
     })
   } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error in POST handler:', error)
+    return NextResponse.json({ 
+      error: 'Failed to process request: ' + (error.message || 'Unknown error')
+    }, { status: 500 })
   }
 }
