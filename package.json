@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@langchain/openai": "^0.3.16",
     "@pinecone-database/pinecone": "^4.0.0",
     "langchain": "^0.3.8",
     "next": "15.1.3",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8",

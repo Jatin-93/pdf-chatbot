@@ -1,18 +1,19 @@
-// File: app/api/chat/route.ts
 import { NextResponse } from 'next/server'
-import { PineconeClient } from '@pinecone-database/pinecone'
+import { Pinecone } from '@pinecone-database/pinecone'
 import { OpenAIEmbeddings } from '@langchain/openai'
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import fs from 'fs'
 import path from 'path'
 import pdf from 'pdf-parse'
 
-// Initialize Pinecone client
-const pinecone = new PineconeClient()
-
 let isInitialized = false
 
-// Function to read and parse PDF
+// Initialize Pinecone client with updated configuration
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY!
+})
+
+// Rest of the code remains the same
 async function processPDF() {
   const pdfPath = path.join(process.cwd(), 'data', 'book.pdf')
   const dataBuffer = fs.readFileSync(pdfPath)
@@ -21,16 +22,10 @@ async function processPDF() {
   return data.text
 }
 
-// Function to ensure Pinecone is initialized and vectors are loaded
 async function initializePinecone() {
   if (isInitialized) return
 
   try {
-    await pinecone.init({
-      environment: process.env.PINECONE_ENVIRONMENT!,
-      apiKey: process.env.PINECONE_API_KEY!,
-    })
-
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!)
     
     // Process PDF and get text
@@ -67,11 +62,7 @@ async function initializePinecone() {
       )
       
       // Upload batch to Pinecone
-      await index.upsert({
-        upsertRequest: {
-          vectors: batchVectors
-        }
-      })
+      await index.upsert(batchVectors)
       console.log(`Uploaded batch ${i/100 + 1}/${Math.ceil(chunks.length/100)}`)
     }
 
@@ -95,11 +86,9 @@ export async function POST(req: Request) {
     
     const queryEmbedding = await embeddings.embedQuery(query)
     const queryResponse = await index.query({
-      queryRequest: {
-        vector: queryEmbedding,
-        topK: 5, // Increased for better context
-        includeMetadata: true
-      }
+      vector: queryEmbedding,
+      topK: 5,
+      includeMetadata: true
     })
 
     const context = queryResponse.matches?.map(match => match.metadata?.text).join('\n')
