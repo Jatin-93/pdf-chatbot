@@ -12,45 +12,32 @@ const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 })
 
-// Configure the PDF path using environment variable with fallback
 const PDF_PATH = process.env.PDF_FILE_PATH || path.join(process.cwd(), 'public', 'book.pdf')
 
-// Debug function to check paths
-function debugPaths() {
-  console.log('Current working directory:', process.cwd())
-  console.log('Attempting to read PDF from:', PDF_PATH)
-  console.log('Directory contents:', fs.readdirSync(process.cwd()))
-  if (fs.existsSync('public')) {
-    console.log('Public directory contents:', fs.readdirSync('public'))
-  }
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
 }
 
 async function processPDF() {
   try {
-    // Log debug information
-    debugPaths()
+    console.log('Current working directory:', process.cwd())
+    console.log('Attempting to read PDF from:', PDF_PATH)
     
-    // Verify file exists
     if (!fs.existsSync(PDF_PATH)) {
-      console.error('PDF file not found at:', PDF_PATH)
       throw new Error(`PDF file not found at path: ${PDF_PATH}`)
     }
     
-    console.log('Reading PDF file...')
     const dataBuffer = fs.readFileSync(PDF_PATH)
-    
-    console.log('Parsing PDF content...')
     const data = await pdf(dataBuffer)
     
     if (!data || !data.text) {
       throw new Error('Failed to extract text from PDF')
     }
     
-    console.log('Successfully extracted text from PDF')
     return data.text
   } catch (error: unknown) {
-    console.error('PDF processing error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    const errorMessage = getErrorMessage(error)
     throw new Error(`Failed to process PDF: ${errorMessage}`)
   }
 }
@@ -61,10 +48,8 @@ async function initializePinecone() {
   try {
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!)
     
-    console.log('Starting PDF processing...')
     const pdfText = await processPDF()
     
-    console.log('Splitting text into chunks...')
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
       chunkOverlap: 200,
@@ -96,10 +81,8 @@ async function initializePinecone() {
     }
 
     isInitialized = true
-    console.log('Initialization complete')
   } catch (error: unknown) {
-    console.error('Initialization error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    const errorMessage = getErrorMessage(error)
     throw new Error(`Initialization failed: ${errorMessage}`)
   }
 }
@@ -153,8 +136,7 @@ export async function POST(req: Request) {
       answer: completion.choices[0].message.content
     })
   } catch (error: unknown) {
-    console.error('Error in POST handler:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    const errorMessage = getErrorMessage(error)
     return NextResponse.json({ 
       error: `Failed to process request: ${errorMessage}`
     }, { status: 500 })

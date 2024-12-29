@@ -50,7 +50,7 @@ export default function Home() {
     <main className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold text-center mb-8">
-          Ask Questions About the Book
+          Ask Your Queries
         </h1>
         
         <form onSubmit={handleSubmit} className="space-y-4 mb-8">
